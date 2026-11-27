@@ -202,7 +202,7 @@ test("options hide the curve, the tiles and the coefficients; no illustration gi
 test("mini card: the next high water and when on one line, the coefficient as status", async () => {
   const card = await make("tide-mini-card", { entity: "sensor.saint_malo_now_tide" });
   const html = card.shadowRoot.innerHTML;
-  assert.match(html, /HW 19:05 · 12\.1 m · 2 h 14 min/);
+  assert.match(html, /HW 7:05 PM · 12\.1 m · 2 h 14 min/, "English defaults to a 12-hour clock");
   assert.match(html, /Coef\. 98/);
   assert.match(html, /class="lvl-rising bn/);
   assert.equal(card.getCardSize(), 1);
@@ -241,4 +241,12 @@ test("editor: the entity, the options and the manual mapping in the advanced par
 test("every language has every key of the English table", () => {
   const en = Object.keys(td.TD_I18N.en).sort();
   for (const [lang, table] of Object.entries(td.TD_I18N)) assert.deepEqual(Object.keys(table).sort(), en, lang);
+});
+
+test("12-hour clocks drop the leading zero, 24-hour clocks keep it", async () => {
+  const twelve = await make("tide-card", { entity: "sensor.saint_malo_now_tide" }, { ...mockHass(), locale: { language: "en", time_format: "12" } });
+  assert.equal(twelve._clock(at(11, 27, 7, 20)), "7:20 AM");
+  assert.equal(twelve._clock(at(11, 27, 19, 44)), "7:44 PM");
+  const day = await make("tide-card", { entity: "sensor.saint_malo_now_tide" }, { ...mockHass(), locale: { language: "en", time_format: "24" } });
+  assert.equal(day._clock(at(11, 27, 7, 20)), "07:20");
 });

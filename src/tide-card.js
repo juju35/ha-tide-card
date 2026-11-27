@@ -180,8 +180,11 @@ class TideCard extends RcCard {
   // 16:51 in the language's and the user's time format.
   _clock(t) {
     const tf = this._hass.locale?.time_format;
-    const opts = { hour: "2-digit", minute: "2-digit", ...(tf === "12" ? { hour12: true } : tf === "24" ? { hour12: false } : {}) };
+    const h12 = tf === "12" ? { hour12: true } : tf === "24" ? { hour12: false } : {};
     try {
+      // 12-hour clocks drop the leading zero (7:20 PM), 24-hour ones keep it (07:20), like Home Assistant.
+      const am = tdIntl(Intl.DateTimeFormat, this._lang(), { hour: "numeric", ...h12 }).resolvedOptions().hour12;
+      const opts = { hour: am ? "numeric" : "2-digit", minute: "2-digit", ...h12 };
       return tdIntl(Intl.DateTimeFormat, this._lang(), opts).format(new Date(t));
     } catch {
       return new Date(t).toTimeString().slice(0, 5);
