@@ -1,27 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { nowOf, setup, wsData } from "../scripts/screenshots/mock.mjs";
+import { at, makeHass, mockHass, NOW, nowOf, st } from "./hass.mjs";
 import { fakeNode, load } from "./load.mjs";
 
-const NOW = nowOf("rising");
 const td = load({ now: NOW });
 const { cards } = td;
 const json = (v) => JSON.parse(JSON.stringify(v));
 const settle = () => new Promise((r) => setTimeout(r, 0));
-const at = (m, d, h, min = 0) => new Date(2026, m - 1, d, h, min).getTime();
-const st = (entity_id, state, attributes = {}) => ({ entity_id, state, attributes });
-
-// The mock home of the screenshots, its Marées France websocket commands answered (and recorded).
-const mockHass = (scene = "rising") => {
-  const { hass } = setup({ scene });
-  const ws = wsData(nowOf(scene));
-  hass.ws = [];
-  hass.callWS = async (msg) => {
-    hass.ws.push(msg);
-    return { "marees_france/get_tides_data": ws.tides, "marees_france/get_water_levels": ws.levels, "marees_france/get_coefficients_data": ws.coefs }[msg.type];
-  };
-  return hass;
-};
 
 const make = async (tag, config, hass = mockHass(), loader = td) => {
   const card = new loader.cards[tag]();
@@ -63,18 +48,15 @@ test("numbers, times and clock times from every integration's formats", () => {
 });
 
 test("each integration is recognised from its platform or its attributes", () => {
-  const hass = {
-    entities: { "sensor.port": { platform: "marees_france" } },
-    states: {
-      "sensor.port": st("sensor.port", "rising"),
-      "sensor.noaa": st("sensor.noaa", "High tide at 7:05 PM", { high_tide_time: "2026-11-27T07:20", low_tide_time: "2026-11-27T01:58" }),
-      "sensor.fork": st("sensor.fork", "High tide at 7:05 PM", { next_tide_type: "High", next_tide_time: "7:05 PM" }),
-      "sensor.wt": st("sensor.wt", "High tide at 07:05 PM", { high_tide_time_utc: "2026-11-26T18:05+0000" }),
-      "sensor.ukho": st("sensor.ukho", "Rising", { predictions: [], next_high_tide_at: "2026-11-26T19:05:00+01:00" }),
-      "sensor.no": st("sensor.no", "250", { next_tide_high: {}, next_tide_low: {} }),
-      "sensor.other": st("sensor.other", "12"),
-    },
-  };
+  const hass = makeHass({
+    "sensor.port": st("sensor.port", "rising"),
+    "sensor.noaa": st("sensor.noaa", "High tide at 7:05 PM", { high_tide_time: "2026-11-27T07:20", low_tide_time: "2026-11-27T01:58" }),
+    "sensor.fork": st("sensor.fork", "High tide at 7:05 PM", { next_tide_type: "High", next_tide_time: "7:05 PM" }),
+    "sensor.wt": st("sensor.wt", "High tide at 07:05 PM", { high_tide_time_utc: "2026-11-26T18:05+0000" }),
+    "sensor.ukho": st("sensor.ukho", "Rising", { predictions: [], next_high_tide_at: "2026-11-26T19:05:00+01:00" }),
+    "sensor.no": st("sensor.no", "250", { next_tide_high: {}, next_tide_low: {} }),
+    "sensor.other": st("sensor.other", "12"),
+  }, { "sensor.port": { platform: "marees_france" } });
   const got = Object.fromEntries(Object.keys(hass.states).map((id) => [id, td.tdSourceOf(hass, id)]));
   assert.deepEqual(json(got), {
     "sensor.port": "marees_france",
@@ -164,15 +146,12 @@ test("the drawn curve goes through every high and low water and stays between th
 });
 
 test("World Tides, UKHO Tides, Norwegian Tide and the NOAA fork", () => {
-  const hass = {
-    entities: {},
-    states: {
-      wt: st("wt", "High tide at 07:05 PM", { high_tide_time_utc: "2026-11-26T18:05+0000", high_tide_height: 4.2, low_tide_time_utc: "2026-11-27T00:20+0000", low_tide_height: -0.3, current_height: 3.1, "Unit displayed": "metric" }),
-      ukho: st("ukho", "Rising", { predictions: [["2026-11-26 12:00:00", 1.1], ["2026-11-26 18:10:00", 5.4], ["2026-11-27 00:25:00", 1.0]] }),
-      no: st("no", "180", { unit_of_measurement: "cm", ebb_flow: "flow", next_tide_high: { time: "2026-11-26T19:30:00+01:00", value: "260" }, next_tide_low: { time: "2026-11-27T01:40:00+01:00", value: "40" } }),
-      fork: st("fork", "High tide at 7:05 PM", { next_tide_type: "High", next_tide_time: "7:05 PM", next_tide_level: 4.9, following_tide_type: "Low", following_tide_time: "1:58 AM", following_tide_level: 0.4, last_tide_type: "Low", last_tide_time: "12:58 PM", last_tide_level: 0.3 }),
-    },
-  };
+  const hass = makeHass({
+    wt: st("wt", "High tide at 07:05 PM", { high_tide_time_utc: "2026-11-26T18:05+0000", high_tide_height: 4.2, low_tide_time_utc: "2026-11-27T00:20+0000", low_tide_height: -0.3, current_height: 3.1, "Unit displayed": "metric" }),
+    ukho: st("ukho", "Rising", { predictions: [["2026-11-26 12:00:00", 1.1], ["2026-11-26 18:10:00", 5.4], ["2026-11-27 00:25:00", 1.0]] }),
+    no: st("no", "180", { unit_of_measurement: "cm", ebb_flow: "flow", next_tide_high: { time: "2026-11-26T19:30:00+01:00", value: "260" }, next_tide_low: { time: "2026-11-27T01:40:00+01:00", value: "40" } }),
+    fork: st("fork", "High tide at 7:05 PM", { next_tide_type: "High", next_tide_time: "7:05 PM", next_tide_level: 4.9, following_tide_type: "Low", following_tide_time: "1:58 AM", following_tide_level: 0.4, last_tide_type: "Low", last_tide_time: "12:58 PM", last_tide_level: 0.3 }),
+  });
   const wt = td.tdModel(hass, { entity: "wt" }, null, NOW);
   assert.deepEqual([wt.source, wt.height, wt.unit, wt.next.type, wt.next.t], ["worldtides", 3.1, "m", "high", Date.UTC(2026, 10, 26, 18, 5)]);
   const uk = td.tdModel(hass, { entity: "ukho" }, null, NOW);
@@ -189,14 +168,11 @@ test("World Tides, UKHO Tides, Norwegian Tide and the NOAA fork", () => {
 });
 
 test("the manual mapping: entities or attributes, for anything else (a Stormglass template, say)", () => {
-  const hass = {
-    entities: {},
-    states: {
-      "sensor.level": st("sensor.level", "2.4", { unit_of_measurement: "m" }),
-      "sensor.next_high": st("sensor.next_high", "2026-11-26T19:05:00+01:00", { height: 4.4 }),
-      "sensor.next_low": st("sensor.next_low", "2026-11-27T01:58:00+01:00", { height: 0.6 }),
-    },
-  };
+  const hass = makeHass({
+    "sensor.level": st("sensor.level", "2.4", { unit_of_measurement: "m" }),
+    "sensor.next_high": st("sensor.next_high", "2026-11-26T19:05:00+01:00", { height: 4.4 }),
+    "sensor.next_low": st("sensor.next_low", "2026-11-27T01:58:00+01:00", { height: 0.6 }),
+  });
   const mapping = {
     height: "sensor.level",
     next_high: "sensor.next_high",
