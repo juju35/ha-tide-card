@@ -120,7 +120,7 @@ export const setup = (s) => {
   return {
     hass: {
       language: "en",
-      locale: { language: "en", time_format: "24" },
+      locale: { language: "en", time_format: "12" },
       config: { unit_system: { length: "km" } },
       entities: {
         "sensor.saint_malo_now_tide": { entity_id: "sensor.saint_malo_now_tide", platform: "marees_france", device_id: "port", translation_key: "now_tide" },
